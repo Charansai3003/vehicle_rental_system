@@ -7,6 +7,7 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const vehicleRoutes = require("./routes/vehicleRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const app = express();
 
@@ -23,6 +24,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/payments", paymentRoutes);
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
