@@ -6,15 +6,30 @@ const authenticateToken = require("../middleware/authMiddleware");
 const authorizeAdmin = require("../middleware/adminMiddleware");
 
 const {
-    createPayment,
+    createPaymentOrder,
+    verifyPayment,
     getMyPayments,
     getAllPayments,
     getPaymentById
 } = require("../controllers/paymentController");
 
-router.post("/", authenticateToken, createPayment);
+router.post(
+    "/create-order",
+    authenticateToken,
+    createPaymentOrder
+);
 
-router.get("/my-payments", authenticateToken, getMyPayments);
+router.post(
+    "/verify",
+    authenticateToken,
+    verifyPayment
+);
+
+router.get(
+    "/my-payments",
+    authenticateToken,
+    getMyPayments
+);
 
 router.get(
     "/",
@@ -23,6 +38,10 @@ router.get(
     getAllPayments
 );
 
-router.get("/:id", authenticateToken, getPaymentById);
+router.get(
+    "/:id",
+    authenticateToken,
+    getPaymentById
+);
 
 module.exports = router;

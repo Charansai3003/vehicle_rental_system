@@ -1,15 +1,23 @@
 const pool = require("../config/db");
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
-const createPayment = async (req, res) => {
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET
+});
+
+const createPaymentOrder = async (req, res) => {
     try {
-        const {
-            booking_id,
-            payment_method
-        } = req.body;
-
+        const { booking_id } = req.body;
         const userId = req.user.id;
 
-        // Check whether the booking exists
+        if (!booking_id) {
+            return res.status(400).json({
+                message: "Booking ID is required"
+            });
+        }
+
         const bookingResult = await pool.query(
             `SELECT *
              FROM bookings
@@ -26,44 +34,167 @@ const createPayment = async (req, res) => {
 
         const booking = bookingResult.rows[0];
 
-        // Check whether payment already exists
+        if (booking.status === "CANCELLED") {
+            return res.status(400).json({
+                message: "Cannot make payment for a cancelled booking"
+            });
+        }
+
+        if (booking.status === "COMPLETED") {
+            return res.status(400).json({
+                message: "Booking is already completed"
+            });
+        }
+
         const existingPayment = await pool.query(
-            `SELECT * FROM payments
+            `SELECT *
+             FROM payments
              WHERE booking_id = $1`,
             [booking_id]
         );
 
         if (existingPayment.rows.length > 0) {
+            const payment = existingPayment.rows[0];
+
+            if (payment.status === "SUCCESS") {
+                return res.status(400).json({
+                    message: "Payment already completed for this booking"
+                });
+            }
+        }
+
+        const options = {
+            amount: Math.round(Number(booking.total_amount) * 100),
+            currency: "INR",
+            receipt: `booking_${booking_id}`
+        };
+
+        const order = await razorpay.orders.create(options);
+
+        res.status(200).json({
+            message: "Razorpay order created successfully",
+            key_id: process.env.RAZORPAY_KEY_ID,
+            order_id: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            booking_id: booking.id
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+const verifyPayment = async (req, res) => {
+    try {
+        const {
+            booking_id,
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+            payment_method
+        } = req.body;
+
+        const userId = req.user.id;
+
+        if (
+            !booking_id ||
+            !razorpay_order_id ||
+            !razorpay_payment_id ||
+            !razorpay_signature
+        ) {
             return res.status(400).json({
-                message: "Payment already exists for this booking"
+                message: "Payment verification details are required"
             });
         }
 
-        // Create a simple transaction ID
-        const transactionId =
-            "TXN_" + Date.now() + "_" + booking_id;
-
-        const paymentResult = await pool.query(
-            `INSERT INTO payments (
-                booking_id,
-                amount,
-                payment_method,
-                transaction_id,
-                status,
-                paid_at
-            )
-            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-            RETURNING *`,
-            [
-                booking_id,
-                booking.total_amount,
-                payment_method,
-                transactionId,
-                "SUCCESS"
-            ]
+        const bookingResult = await pool.query(
+            `SELECT *
+             FROM bookings
+             WHERE id = $1
+             AND user_id = $2`,
+            [booking_id, userId]
         );
 
-        // Confirm the booking after successful payment
+        if (bookingResult.rows.length === 0) {
+            return res.status(404).json({
+                message: "Booking not found or you are not authorized"
+            });
+        }
+
+        const generatedSignature = crypto
+            .createHmac(
+                "sha256",
+                process.env.RAZORPAY_KEY_SECRET
+            )
+            .update(
+                razorpay_order_id + "|" + razorpay_payment_id
+            )
+            .digest("hex");
+
+        if (generatedSignature !== razorpay_signature) {
+            return res.status(400).json({
+                message: "Payment verification failed"
+            });
+        }
+
+        const existingPayment = await pool.query(
+            `SELECT *
+             FROM payments
+             WHERE booking_id = $1`,
+            [booking_id]
+        );
+
+        let payment;
+
+        if (existingPayment.rows.length > 0) {
+            const result = await pool.query(
+                `UPDATE payments
+                 SET payment_method = $1,
+                     transaction_id = $2,
+                     status = 'SUCCESS',
+                     paid_at = CURRENT_TIMESTAMP
+                 WHERE booking_id = $3
+                 RETURNING *`,
+                [
+                    payment_method || "RAZORPAY",
+                    razorpay_payment_id,
+                    booking_id
+                ]
+            );
+
+            payment = result.rows[0];
+
+        } else {
+            const booking = bookingResult.rows[0];
+
+            const result = await pool.query(
+                `INSERT INTO payments (
+                    booking_id,
+                    amount,
+                    payment_method,
+                    transaction_id,
+                    status,
+                    paid_at
+                )
+                VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+                RETURNING *`,
+                [
+                    booking_id,
+                    booking.total_amount,
+                    payment_method || "RAZORPAY",
+                    razorpay_payment_id,
+                    "SUCCESS"
+                ]
+            );
+
+            payment = result.rows[0];
+        }
+
         await pool.query(
             `UPDATE bookings
              SET status = 'CONFIRMED',
@@ -72,9 +203,9 @@ const createPayment = async (req, res) => {
             [booking_id]
         );
 
-        res.status(201).json({
-            message: "Payment successful and booking confirmed",
-            payment: paymentResult.rows[0]
+        res.status(200).json({
+            message: "Payment verified successfully and booking confirmed",
+            payment
         });
 
     } catch (error) {
@@ -137,24 +268,17 @@ const getAllPayments = async (req, res) => {
                 payments.transaction_id,
                 payments.status,
                 payments.paid_at,
-
                 users.name AS user_name,
                 users.email AS user_email,
-
                 vehicles.brand,
                 vehicles.model
-
             FROM payments
-
             JOIN bookings
                 ON payments.booking_id = bookings.id
-
             JOIN users
                 ON bookings.user_id = users.id
-
             JOIN vehicles
                 ON bookings.vehicle_id = vehicles.id
-
             ORDER BY payments.id DESC`
         );
 
@@ -249,7 +373,8 @@ const getPaymentById = async (req, res) => {
 };
 
 module.exports = {
-    createPayment,
+    createPaymentOrder,
+    verifyPayment,
     getMyPayments,
     getAllPayments,
     getPaymentById
