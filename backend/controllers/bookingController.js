@@ -3,12 +3,13 @@ const pool = require("../config/db");
 const createBooking = async (req, res) => {
     try {
         const {
-            user_id,
             vehicle_id,
             start_date,
             end_date,
             total_amount
         } = req.body;
+
+        const user_id = req.user.id;
 
         const vehicleResult = await pool.query(
             `SELECT * FROM vehicles WHERE id = $1`,
@@ -113,36 +114,79 @@ const getAllBookings = async (req, res) => {
     }
 };
 
+/*
+    ADMIN:
+    Can view any booking.
+
+    NORMAL USER:
+    Can view only their own booking.
+*/
 const getBookingById = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user.id;
+        const userRole = req.user.role;
 
-        const result = await pool.query(
-            `SELECT 
-                bookings.id,
-                users.name AS user_name,
-                users.email AS user_email,
-                vehicles.brand,
-                vehicles.model,
-                vehicle_categories.name AS category,
-                bookings.start_date,
-                bookings.end_date,
-                bookings.total_amount,
-                bookings.status,
-                bookings.created_at,
-                bookings.updated_at
-            FROM bookings
-            JOIN users ON bookings.user_id = users.id
-            JOIN vehicles ON bookings.vehicle_id = vehicles.id
-            JOIN vehicle_categories 
-                ON vehicles.category_id = vehicle_categories.id
-            WHERE bookings.id = $1`,
-            [id]
-        );
+        let query;
+        let values;
+
+        if (userRole === "ADMIN") {
+            query = `
+                SELECT 
+                    bookings.id,
+                    users.name AS user_name,
+                    users.email AS user_email,
+                    vehicles.brand,
+                    vehicles.model,
+                    vehicle_categories.name AS category,
+                    bookings.start_date,
+                    bookings.end_date,
+                    bookings.total_amount,
+                    bookings.status,
+                    bookings.created_at,
+                    bookings.updated_at
+                FROM bookings
+                JOIN users ON bookings.user_id = users.id
+                JOIN vehicles ON bookings.vehicle_id = vehicles.id
+                JOIN vehicle_categories 
+                    ON vehicles.category_id = vehicle_categories.id
+                WHERE bookings.id = $1
+            `;
+
+            values = [id];
+
+        } else {
+            query = `
+                SELECT 
+                    bookings.id,
+                    users.name AS user_name,
+                    users.email AS user_email,
+                    vehicles.brand,
+                    vehicles.model,
+                    vehicle_categories.name AS category,
+                    bookings.start_date,
+                    bookings.end_date,
+                    bookings.total_amount,
+                    bookings.status,
+                    bookings.created_at,
+                    bookings.updated_at
+                FROM bookings
+                JOIN users ON bookings.user_id = users.id
+                JOIN vehicles ON bookings.vehicle_id = vehicles.id
+                JOIN vehicle_categories 
+                    ON vehicles.category_id = vehicle_categories.id
+                WHERE bookings.id = $1
+                AND bookings.user_id = $2
+            `;
+
+            values = [id, userId];
+        }
+
+        const result = await pool.query(query, values);
 
         if (result.rows.length === 0) {
             return res.status(404).json({
-                message: "Booking not found"
+                message: "Booking not found or you are not authorized"
             });
         }
 
@@ -163,6 +207,7 @@ const updateBookingStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+
         const validStatuses = [
             "PENDING",
             "CONFIRMED",
@@ -173,7 +218,7 @@ const updateBookingStatus = async (req, res) => {
         if (!validStatuses.includes(status)) {
             return res.status(400).json({
                 message: "Invalid booking status"
-             });
+            });
         }
 
         const result = await pool.query(
@@ -208,19 +253,22 @@ const updateBookingStatus = async (req, res) => {
 const cancelBooking = async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user.id;
 
         const result = await pool.query(
             `UPDATE bookings
              SET status = $1,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
+             AND user_id = $3
+             AND status IN ('PENDING', 'CONFIRMED')
              RETURNING *`,
-            ["CANCELLED", id]
+            ["CANCELLED", id, userId]
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({
-                message: "Booking not found"
+            return res.status(400).json({
+                message: "Booking cannot be cancelled or you are not authorized"
             });
         }
 
@@ -238,10 +286,49 @@ const cancelBooking = async (req, res) => {
     }
 };
 
+const getMyBookings = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const result = await pool.query(
+            `SELECT
+                bookings.id,
+                vehicles.brand,
+                vehicles.model,
+                vehicle_categories.name AS category,
+                bookings.start_date,
+                bookings.end_date,
+                bookings.total_amount,
+                bookings.status,
+                bookings.created_at,
+                bookings.updated_at
+            FROM bookings
+            JOIN vehicles ON bookings.vehicle_id = vehicles.id
+            JOIN vehicle_categories
+                ON vehicles.category_id = vehicle_categories.id
+            WHERE bookings.user_id = $1
+            ORDER BY bookings.id DESC`,
+            [userId]
+        );
+
+        res.status(200).json({
+            bookings: result.rows
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
 module.exports = {
     createBooking,
     getAllBookings,
     getBookingById,
     updateBookingStatus,
-    cancelBooking
+    cancelBooking,
+    getMyBookings
 };
