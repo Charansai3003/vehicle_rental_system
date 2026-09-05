@@ -15,12 +15,18 @@ import ManageVehicles from "./pages/manageVehicles";
 import ManageBookings from "./pages/manageBookings";
 import ManagePayments from "./pages/managePayments";
 import NotFound from "./pages/notFound";
+import Booking from "./pages/booking";
+import Payment from "./pages/payment";
 
 function App() {
     return (
         <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+
+            <Route path="/payment/:id" element={<Payment />} />
+            
+            <Route path="/booking/:id" element={<Booking />} />
 
             <Route element={<CustomerLayout />}>
                 <Route path="/" element={<Home />} />
