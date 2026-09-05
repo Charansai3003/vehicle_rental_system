@@ -64,15 +64,74 @@ const addVehicle = async (req, res) => {
 
 const getAllVehicles = async (req, res) => {
     try {
-        const vehicles = await pool.query(
-         `SELECT 
-            vehicles.*,
-            vehicle_categories.name AS category_name
-        FROM vehicles
-        JOIN vehicle_categories
-            ON vehicles.category_id = vehicle_categories.id
-        ORDER BY vehicles.id ASC`
-        );
+        const {
+            search,
+            category,
+            status,
+            fuel_type,
+            transmission
+        } = req.query;
+
+        let query = `
+            SELECT
+                vehicles.*,
+                vehicle_categories.name AS category_name
+            FROM vehicles
+            JOIN vehicle_categories
+                ON vehicles.category_id = vehicle_categories.id
+        `;
+
+        const conditions = [];
+        const values = [];
+
+        if (search) {
+            values.push(`%${search}%`);
+
+            conditions.push(
+                `(vehicles.brand ILIKE $${values.length}
+                OR vehicles.model ILIKE $${values.length})`
+            );
+        }
+
+        if (category) {
+            values.push(category);
+
+            conditions.push(
+                `vehicle_categories.name ILIKE $${values.length}`
+            );
+        }
+
+        if (status) {
+            values.push(status);
+
+            conditions.push(
+                `vehicles.status = $${values.length}`
+            );
+        }
+
+        if (fuel_type) {
+            values.push(fuel_type);
+
+            conditions.push(
+                `vehicles.fuel_type = $${values.length}`
+            );
+        }
+
+        if (transmission) {
+            values.push(transmission);
+
+            conditions.push(
+                `vehicles.transmission = $${values.length}`
+            );
+        }
+
+        if (conditions.length > 0) {
+            query += ` WHERE ${conditions.join(" AND ")}`;
+        }
+
+        query += ` ORDER BY vehicles.id ASC`;
+
+        const vehicles = await pool.query(query, values);
 
         res.status(200).json({
             vehicles: vehicles.rows
@@ -92,7 +151,7 @@ const getVehicleById = async (req, res) => {
         const { id } = req.params;
 
         const vehicle = await pool.query(
-            `SELECT 
+            `SELECT
                 vehicles.*,
                 vehicle_categories.name AS category_name
              FROM vehicles
