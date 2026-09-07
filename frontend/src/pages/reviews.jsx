@@ -3,15 +3,120 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 function Reviews() {
+    const [completedBookings, setCompletedBookings] = useState([]);
     const [reviews, setReviews] = useState([]);
+
+    const [bookingId, setBookingId] = useState("");
     const [vehicleId, setVehicleId] = useState("");
+
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState("");
+
+    const [loadingBookings, setLoadingBookings] = useState(true);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    const getToken = () => {
+        return localStorage.getItem("token");
+    };
+
+    const fetchCompletedBookings = async () => {
+        try {
+            setLoadingBookings(true);
+
+            const token = getToken();
+
+            if (!token) {
+                toast.error("Please login again");
+                return;
+            }
+
+            const response = await axios.get(
+                "http://localhost:5000/api/bookings/my-bookings",
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            const bookings = response.data.bookings || [];
+
+            const completed = bookings.filter(
+                (booking) =>
+                    String(booking.status).toUpperCase() ===
+                    "COMPLETED"
+            );
+
+            setCompletedBookings(completed);
+
+            if (completed.length > 0) {
+                const firstBooking = completed[0];
+
+                setBookingId(String(firstBooking.id));
+
+                if (firstBooking.vehicle_id) {
+                    setVehicleId(
+                        String(firstBooking.vehicle_id)
+                    );
+                }
+            }
+        } catch (error) {
+            console.error(error);
+
+            toast.error(
+                error.response?.data?.message ||
+                "Failed to load completed bookings"
+            );
+        } finally {
+            setLoadingBookings(false);
+        }
+    };
+
+    const fetchBookingDetails = async (id) => {
+        if (!id) {
+            setVehicleId("");
+            return;
+        }
+
+        try {
+            const token = getToken();
+
+            const response = await axios.get(
+                `http://localhost:5000/api/bookings/${id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            const booking = response.data.booking;
+
+            if (!booking || !booking.vehicle_id) {
+                toast.error(
+                    "Vehicle information could not be found"
+                );
+                setVehicleId("");
+                return;
+            }
+
+            setVehicleId(String(booking.vehicle_id));
+        } catch (error) {
+            console.error(error);
+
+            toast.error(
+                error.response?.data?.message ||
+                "Failed to load booking details"
+            );
+
+            setVehicleId("");
+        }
+    };
+
     const fetchReviews = async (id) => {
         if (!id) {
+            setReviews([]);
             return;
         }
 
@@ -22,8 +127,10 @@ function Reviews() {
                 `http://localhost:5000/api/reviews/vehicle/${id}`
             );
 
-            setReviews(response.data.reviews);
+            setReviews(response.data.reviews || []);
         } catch (error) {
+            console.error(error);
+
             toast.error(
                 error.response?.data?.message ||
                 "Failed to load reviews"
@@ -33,22 +140,43 @@ function Reviews() {
         }
     };
 
-    const handleSearchReviews = (e) => {
-        e.preventDefault();
+    useEffect(() => {
+        fetchCompletedBookings();
+    }, []);
 
-        if (!vehicleId) {
-            toast.error("Please enter a vehicle ID");
-            return;
+    useEffect(() => {
+        if (bookingId) {
+            fetchBookingDetails(bookingId);
         }
+    }, [bookingId]);
 
-        fetchReviews(vehicleId);
+    useEffect(() => {
+        if (vehicleId) {
+            fetchReviews(vehicleId);
+        }
+    }, [vehicleId]);
+
+    const handleBookingChange = (e) => {
+        const selectedBookingId = e.target.value;
+
+        setBookingId(selectedBookingId);
+        setVehicleId("");
+        setRating(5);
+        setComment("");
     };
 
     const handleSubmitReview = async (e) => {
         e.preventDefault();
 
+        if (!bookingId) {
+            toast.error("Please select a completed booking");
+            return;
+        }
+
         if (!vehicleId) {
-            toast.error("Please enter a vehicle ID");
+            toast.error(
+                "Vehicle information could not be found"
+            );
             return;
         }
 
@@ -60,7 +188,12 @@ function Reviews() {
         try {
             setSubmitting(true);
 
-            const token = localStorage.getItem("token");
+            const token = getToken();
+
+            if (!token) {
+                toast.error("Please login again");
+                return;
+            }
 
             const response = await axios.post(
                 "http://localhost:5000/api/reviews",
@@ -76,13 +209,18 @@ function Reviews() {
                 }
             );
 
-            toast.success(response.data.message);
+            toast.success(
+                response.data.message ||
+                "Review added successfully"
+            );
 
             setComment("");
             setRating(5);
 
             fetchReviews(vehicleId);
         } catch (error) {
+            console.error(error);
+
             toast.error(
                 error.response?.data?.message ||
                 "Failed to add review"
@@ -91,6 +229,11 @@ function Reviews() {
             setSubmitting(false);
         }
     };
+
+    const selectedBooking = completedBookings.find(
+        (booking) =>
+            String(booking.id) === String(bookingId)
+    );
 
     return (
         <div className="reviews-page">
@@ -107,81 +250,126 @@ function Reviews() {
 
             <div className="reviews-container">
 
-                <form
-                    className="review-search"
-                    onSubmit={handleSearchReviews}
-                >
-                    <input
-                        type="number"
-                        placeholder="Enter vehicle ID"
-                        value={vehicleId}
-                        min="1"
-                        onChange={(e) =>
-                            setVehicleId(e.target.value)
-                        }
-                    />
+                {loadingBookings ? (
+                    <div className="reviews-message">
+                        Loading your completed bookings...
+                    </div>
+                ) : completedBookings.length === 0 ? (
+                    <div className="reviews-message">
+                        You don't have any completed bookings yet.
+                        Complete a booking to write a review.
+                    </div>
+                ) : (
+                    <>
+                        <div className="review-search">
 
-                    <button type="submit">
-                        View Reviews
-                    </button>
-                </form>
+                            <div className="review-vehicle-select">
 
-                <form
-                    className="review-form"
-                    onSubmit={handleSubmitReview}
-                >
-                    <h2>Write a Review</h2>
+                                <label>
+                                    Select a completed booking
+                                </label>
 
-                    <div className="rating-input">
-                        <label>Rating</label>
-
-                        <div className="stars">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <button
-                                    type="button"
-                                    key={star}
-                                    className={
-                                        star <= rating
-                                            ? "star active"
-                                            : "star"
-                                    }
-                                    onClick={() =>
-                                        setRating(star)
-                                    }
+                                <select
+                                    value={bookingId}
+                                    onChange={handleBookingChange}
                                 >
-                                    ★
-                                </button>
-                            ))}
+                                    {completedBookings.map(
+                                        (booking) => (
+                                            <option
+                                                key={booking.id}
+                                                value={booking.id}
+                                            >
+                                                Booking #{booking.id} -{" "}
+                                                {booking.brand}{" "}
+                                                {booking.model}
+                                            </option>
+                                        )
+                                    )}
+                                </select>
+
+                            </div>
+
                         </div>
-                    </div>
 
-                    <div className="review-comment">
-                        <label>Comment</label>
+                        <form
+                            className="review-form"
+                            onSubmit={handleSubmitReview}
+                        >
+                            <h2>Write a Review</h2>
 
-                        <textarea
-                            placeholder="Write your experience..."
-                            value={comment}
-                            onChange={(e) =>
-                                setComment(e.target.value)
-                            }
-                            rows="4"
-                        />
-                    </div>
+                            {selectedBooking && (
+                                <p>
+                                    Reviewing:{" "}
+                                    <strong>
+                                        {selectedBooking.brand}{" "}
+                                        {selectedBooking.model}
+                                    </strong>
+                                </p>
+                            )}
 
-                    <button
-                        type="submit"
-                        className="submit-review-btn"
-                        disabled={submitting}
-                    >
-                        {submitting
-                            ? "Submitting..."
-                            : "Submit Review"}
-                    </button>
-                </form>
+                            <div className="rating-input">
+
+                                <label>Rating</label>
+
+                                <div className="stars">
+                                    {[1, 2, 3, 4, 5].map(
+                                        (star) => (
+                                            <button
+                                                type="button"
+                                                key={star}
+                                                className={
+                                                    star <= rating
+                                                        ? "star active"
+                                                        : "star"
+                                                }
+                                                onClick={() =>
+                                                    setRating(star)
+                                                }
+                                            >
+                                                ★
+                                            </button>
+                                        )
+                                    )}
+                                </div>
+
+                            </div>
+
+                            <div className="review-comment">
+
+                                <label>Comment</label>
+
+                                <textarea
+                                    placeholder="Write your experience..."
+                                    value={comment}
+                                    onChange={(e) =>
+                                        setComment(e.target.value)
+                                    }
+                                    rows="4"
+                                />
+
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="submit-review-btn"
+                                disabled={
+                                    submitting ||
+                                    !vehicleId
+                                }
+                            >
+                                {submitting
+                                    ? "Submitting..."
+                                    : "Submit Review"}
+                            </button>
+
+                        </form>
+                    </>
+                )}
 
                 <div className="reviews-list">
 
                     <div className="reviews-list-header">
+
                         <h2>Reviews</h2>
 
                         {vehicleId && (
@@ -189,11 +377,17 @@ function Reviews() {
                                 Vehicle #{vehicleId}
                             </span>
                         )}
+
                     </div>
 
                     {loading ? (
                         <div className="reviews-message">
                             Loading reviews...
+                        </div>
+                    ) : !vehicleId ? (
+                        <div className="reviews-message">
+                            Select a completed booking to view
+                            reviews.
                         </div>
                     ) : reviews.length === 0 ? (
                         <div className="reviews-message">
@@ -205,7 +399,9 @@ function Reviews() {
                                 className="review-card"
                                 key={review.id}
                             >
+
                                 <div className="review-card-top">
+
                                     <div>
                                         <h3>
                                             {review.user_name}
@@ -219,11 +415,15 @@ function Reviews() {
                                     </div>
 
                                     <div className="review-rating">
-                                        {"★".repeat(review.rating)}
+                                        {"★".repeat(
+                                            review.rating
+                                        )}
+
                                         {"☆".repeat(
                                             5 - review.rating
                                         )}
                                     </div>
+
                                 </div>
 
                                 {review.comment && (
@@ -231,6 +431,7 @@ function Reviews() {
                                         {review.comment}
                                     </p>
                                 )}
+
                             </div>
                         ))
                     )}

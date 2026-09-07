@@ -2720,3 +2720,108 @@ body {
         font-size: 18px;
     }
 }
+
+.not-found-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    background: #f8fafc;
+    box-sizing: border-box;
+}
+
+.not-found-container {
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+    padding: 50px 30px;
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 10px 35px rgba(15, 23, 42, 0.08);
+}
+
+.not-found-number {
+    font-size: 100px;
+    font-weight: 800;
+    line-height: 1;
+    color: #2563eb;
+    margin-bottom: 20px;
+}
+
+.not-found-container h1 {
+    margin: 0 0 12px;
+    font-size: 32px;
+    color: #0f172a;
+}
+
+.not-found-container p {
+    margin: 0 auto 28px;
+    max-width: 450px;
+    color: #64748b;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.not-found-home-btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 8px;
+    background: #2563eb;
+    color: white;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: 0.2s ease;
+}
+
+.not-found-home-btn:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 500px) {
+    .not-found-container {
+        padding: 40px 20px;
+    }
+
+    .not-found-number {
+        font-size: 75px;
+    }
+
+    .not-found-container h1 {
+        font-size: 26px;
+    }
+
+    .not-found-container p {
+        font-size: 14px;
+    }
+}
+
+.review-vehicle-select {
+    width: 100%;
+}
+
+.review-vehicle-select label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.review-vehicle-select select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: white;
+    color: #0f172a;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+}
+
+.review-vehicle-select select:focus {
+    border-color: #2563eb;
+}

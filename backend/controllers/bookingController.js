@@ -44,7 +44,9 @@ const createBooking = async (req, res) => {
         }
 
         const vehicleResult = await pool.query(
-            `SELECT * FROM vehicles WHERE id = $1`,
+            `SELECT *
+             FROM vehicles
+             WHERE id = $1`,
             [vehicle_id]
         );
 
@@ -63,11 +65,12 @@ const createBooking = async (req, res) => {
         }
 
         const overlapResult = await pool.query(
-            `SELECT * FROM bookings
+            `SELECT *
+             FROM bookings
              WHERE vehicle_id = $1
-                AND status IN ('PENDING', 'CONFIRMED')
-                AND start_date < $3
-                AND end_date > $2`,
+               AND status IN ('PENDING', 'CONFIRMED')
+               AND start_date < $3
+               AND end_date > $2`,
             [vehicle_id, start_date, end_date]
         );
 
@@ -77,7 +80,8 @@ const createBooking = async (req, res) => {
             });
         }
 
-        const millisecondsPerDay = 1000 * 60 * 60 * 24;
+        const millisecondsPerDay =
+            1000 * 60 * 60 * 24;
 
         const rentalDays = Math.ceil(
             (endDate - startDate) / millisecondsPerDay
@@ -123,11 +127,13 @@ const createBooking = async (req, res) => {
     }
 };
 
+
 const getAllBookings = async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT
                 bookings.id,
+                bookings.vehicle_id,
                 users.name AS user_name,
                 users.email AS user_email,
                 vehicles.brand,
@@ -139,11 +145,13 @@ const getAllBookings = async (req, res) => {
                 bookings.status,
                 bookings.created_at
             FROM bookings
-            JOIN users ON bookings.user_id = users.id
-            JOIN vehicles ON bookings.vehicle_id = vehicles.id
+            JOIN users
+                ON bookings.user_id = users.id
+            JOIN vehicles
+                ON bookings.vehicle_id = vehicles.id
             JOIN vehicle_categories
                 ON vehicles.category_id = vehicle_categories.id
-            ORDER BY bookings.id;
+            ORDER BY bookings.id
         `);
 
         res.status(200).json({
@@ -159,9 +167,11 @@ const getAllBookings = async (req, res) => {
     }
 };
 
+
 const getBookingById = async (req, res) => {
     try {
         const { id } = req.params;
+
         const userId = req.user.id;
         const userRole = req.user.role;
 
@@ -172,6 +182,8 @@ const getBookingById = async (req, res) => {
             query = `
                 SELECT
                     bookings.id,
+                    bookings.vehicle_id,
+                    bookings.user_id,
                     users.name AS user_name,
                     users.email AS user_email,
                     vehicles.brand,
@@ -184,8 +196,10 @@ const getBookingById = async (req, res) => {
                     bookings.created_at,
                     bookings.updated_at
                 FROM bookings
-                JOIN users ON bookings.user_id = users.id
-                JOIN vehicles ON bookings.vehicle_id = vehicles.id
+                JOIN users
+                    ON bookings.user_id = users.id
+                JOIN vehicles
+                    ON bookings.vehicle_id = vehicles.id
                 JOIN vehicle_categories
                     ON vehicles.category_id = vehicle_categories.id
                 WHERE bookings.id = $1
@@ -197,6 +211,8 @@ const getBookingById = async (req, res) => {
             query = `
                 SELECT
                     bookings.id,
+                    bookings.vehicle_id,
+                    bookings.user_id,
                     users.name AS user_name,
                     users.email AS user_email,
                     vehicles.brand,
@@ -209,8 +225,10 @@ const getBookingById = async (req, res) => {
                     bookings.created_at,
                     bookings.updated_at
                 FROM bookings
-                JOIN users ON bookings.user_id = users.id
-                JOIN vehicles ON bookings.vehicle_id = vehicles.id
+                JOIN users
+                    ON bookings.user_id = users.id
+                JOIN vehicles
+                    ON bookings.vehicle_id = vehicles.id
                 JOIN vehicle_categories
                     ON vehicles.category_id = vehicle_categories.id
                 WHERE bookings.id = $1
@@ -220,7 +238,10 @@ const getBookingById = async (req, res) => {
             values = [id, userId];
         }
 
-        const result = await pool.query(query, values);
+        const result = await pool.query(
+            query,
+            values
+        );
 
         if (result.rows.length === 0) {
             return res.status(404).json({
@@ -241,6 +262,7 @@ const getBookingById = async (req, res) => {
     }
 };
 
+
 const updateBookingStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -253,7 +275,9 @@ const updateBookingStatus = async (req, res) => {
         }
 
         const bookingResult = await pool.query(
-            `SELECT * FROM bookings WHERE id = $1`,
+            `SELECT *
+             FROM bookings
+             WHERE id = $1`,
             [id]
         );
 
@@ -271,7 +295,10 @@ const updateBookingStatus = async (req, res) => {
             });
         }
 
-        const endDate = new Date(booking.end_date);
+        const endDate = new Date(
+            booking.end_date
+        );
+
         const now = new Date();
 
         if (now < endDate) {
@@ -286,7 +313,10 @@ const updateBookingStatus = async (req, res) => {
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
              RETURNING *`,
-            ["COMPLETED", id]
+            [
+                "COMPLETED",
+                id
+            ]
         );
 
         res.status(200).json({
@@ -303,9 +333,11 @@ const updateBookingStatus = async (req, res) => {
     }
 };
 
+
 const cancelBooking = async (req, res) => {
     try {
         const { id } = req.params;
+
         const userId = req.user.id;
 
         const bookingResult = await pool.query(
@@ -333,7 +365,10 @@ const cancelBooking = async (req, res) => {
             });
         }
 
-        const startDate = new Date(booking.start_date);
+        const startDate = new Date(
+            booking.start_date
+        );
+
         const now = new Date();
 
         if (startDate <= now) {
@@ -348,7 +383,10 @@ const cancelBooking = async (req, res) => {
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $2
              RETURNING *`,
-            ["CANCELLED", id]
+            [
+                "CANCELLED",
+                id
+            ]
         );
 
         res.status(200).json({
@@ -365,6 +403,7 @@ const cancelBooking = async (req, res) => {
     }
 };
 
+
 const getMyBookings = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -372,17 +411,20 @@ const getMyBookings = async (req, res) => {
         const result = await pool.query(
             `SELECT
                 bookings.id,
-                vehicles.brand,
-                vehicles.model,
-                vehicle_categories.name AS category,
+                bookings.vehicle_id,
+                bookings.user_id,
                 bookings.start_date,
                 bookings.end_date,
                 bookings.total_amount,
                 bookings.status,
                 bookings.created_at,
-                bookings.updated_at
+                bookings.updated_at,
+                vehicles.brand,
+                vehicles.model,
+                vehicle_categories.name AS category
             FROM bookings
-            JOIN vehicles ON bookings.vehicle_id = vehicles.id
+            JOIN vehicles
+                ON bookings.vehicle_id = vehicles.id
             JOIN vehicle_categories
                 ON vehicles.category_id = vehicle_categories.id
             WHERE bookings.user_id = $1
@@ -395,13 +437,14 @@ const getMyBookings = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Get My Bookings Error:", error);
 
         res.status(500).json({
             message: "Server error"
         });
     }
 };
+
 
 module.exports = {
     createBooking,
