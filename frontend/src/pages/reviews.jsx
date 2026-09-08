@@ -32,7 +32,7 @@ function Reviews() {
             }
 
             const response = await axios.get(
-                "http://localhost:5000/api/bookings/my-bookings",
+                `${import.meta.env.VITE_API_URL}/bookings/my-bookings`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`
@@ -83,7 +83,7 @@ function Reviews() {
             const token = getToken();
 
             const response = await axios.get(
-                `http://localhost:5000/api/bookings/${id}`,
+                `${import.meta.env.VITE_API_URL}/bookings/${id}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`
@@ -124,7 +124,7 @@ function Reviews() {
             setLoading(true);
 
             const response = await axios.get(
-                `http://localhost:5000/api/reviews/vehicle/${id}`
+                `${import.meta.env.VITE_API_URL}/reviews/vehicle/${id}`
             );
 
             setReviews(response.data.reviews || []);
@@ -196,7 +196,7 @@ function Reviews() {
             }
 
             const response = await axios.post(
-                "http://localhost:5000/api/reviews",
+                `${import.meta.env.VITE_API_URL}/reviews`,
                 {
                     vehicle_id: Number(vehicleId),
                     rating: Number(rating),

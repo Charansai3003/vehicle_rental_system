@@ -28,7 +28,7 @@ function ManageVehicles() {
             setLoading(true);
 
             const response = await axios.get(
-                "http://localhost:5000/api/vehicles"
+                `${import.meta.env.VITE_API_URL}/vehicles`
             );
 
             setVehicles(response.data.vehicles);
@@ -130,7 +130,7 @@ function ManageVehicles() {
 
             if (editingVehicle) {
                 const response = await axios.put(
-                    `http://localhost:5000/api/vehicles/${editingVehicle.id}`,
+                    `${import.meta.env.VITE_API_URL}/vehicles/${editingVehicle.id}`,
                     data,
                     {
                         headers: {
@@ -145,7 +145,7 @@ function ManageVehicles() {
                 );
             } else {
                 const response = await axios.post(
-                    "http://localhost:5000/api/vehicles",
+                    `${import.meta.env.VITE_API_URL}/vehicles`,
                     data,
                     {
                         headers: {
@@ -188,7 +188,7 @@ function ManageVehicles() {
             }
 
             const response = await axios.delete(
-                `http://localhost:5000/api/vehicles/${vehicleId}`,
+                `${import.meta.env.VITE_API_URL}/vehicles/${vehicleId}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`

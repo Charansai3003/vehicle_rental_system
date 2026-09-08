@@ -12,7 +12,7 @@ function MyPayments() {
                 const token = localStorage.getItem("token");
 
                 const response = await axios.get(
-                    "http://localhost:5000/api/payments/my-payments",
+                    `${import.meta.env.VITE_API_URL}/payments/my-payments`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`

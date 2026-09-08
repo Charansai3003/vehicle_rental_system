@@ -18,7 +18,7 @@ function Payment() {
                 const token = localStorage.getItem("token");
 
                 const response = await axios.get(
-                    `http://localhost:5000/api/bookings/${id}`,
+                    `${import.meta.env.VITE_API_URL}/bookings/${id}`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`
@@ -78,7 +78,7 @@ function Payment() {
             const token = localStorage.getItem("token");
 
             const orderResponse = await axios.post(
-                "http://localhost:5000/api/payments/create-order",
+                `${import.meta.env.VITE_API_URL}/payments/create-order`,
                 {
                     booking_id: Number(id)
                 },
@@ -108,7 +108,7 @@ function Payment() {
                     try {
                         const verifyResponse =
                             await axios.post(
-                                "http://localhost:5000/api/payments/verify",
+                                `${import.meta.env.VITE_API_URL}/payments/verify`,
                                 {
                                     booking_id: Number(id),
 
